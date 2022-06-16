@@ -3,6 +3,9 @@
 //require_once('tcpdf/config/lang/eng.php');
 require_once('TCPDF/examples/tcpdf_include.php');
 require_once('TCPDF/examples/lang/eng.php');
+require_once ('PDFMerger.php');
+
+use PDFMerger\PDFMerger;
 
 class Process
 {
@@ -27,7 +30,7 @@ class Process
 
     }
 
-    public function All_session_list()
+    public function All_session_list($for='')
     {
         ini_set('max_execution_time', 3000);
         ini_set("memory_limit","-1");
@@ -54,8 +57,13 @@ class Process
                     if($row["notes_type"]=='pdf')
                     {
                         $merge_file_name="merged.pdf";
-                        $all_files_merge[]=$notes_pdf_dir.$merge_file_name;
-
+                        $merge_file=$notes_pdf_dir.$merge_file_name;
+                        $all_files_merge[]=$merge_file;
+                        if($for=='delete_merge_file')
+                        {
+                            unlink($merge_file);
+                            continue;
+                        }
                         $notes_file_name='notes.pdf';
                         $return1=$this->downloadPdffromUrl($notes_pdf_dir,$notes_file_name,$notes_url);
                     }
@@ -66,8 +74,8 @@ class Process
                     $retun_file=$this->createTitlePdf($row,$title_dir,$title_file_name);
 
                      //merged pdf creation
-                     $input_list=implode(" ",[$notes_pdf_dir.'title.pdf',$notes_pdf_dir.'notes.pdf']);
-                     $retun_file=$this->mergefiles($notes_pdf_dir.$merge_file_name,$input_list);
+                     $input_list=[$title_dir.'title.pdf',$title_dir.'notes.pdf'];
+                     $retun_file=$this->mergefiles($title_dir.$merge_file_name,$input_list);
                     
                      //count the total page
                      if($row['total_page']==0 && $row["notes_type"]=='pdf')
@@ -79,15 +87,15 @@ class Process
                 //echo $notes_pdf_dir.$merge_file_name.'<br>';
                 // exit();
             }
-
+           
             if(!empty($master_folder))
             {
                 // echo '<pre>';
                 // var_Export($all_files_merge);
                 // exit();
                 $final_pdf=$master_folder.'.pdf';
-                $output_dir=$this->main_dir.$this->ds.$master_folder.$this->ds.$final_pdf;
-                $input_dir=implode(" ",$all_files_merge);
+                $output_dir=__dir__.$this->ds.$this->main_dir.$this->ds.$master_folder.$this->ds.$final_pdf;
+                $input_dir=$all_files_merge;
                 $this->mergefiles($output_dir,$input_dir);
             }
             echo "Success";
@@ -132,7 +140,7 @@ class Process
     public function custom_query($for)
     {
         if($for=='folder_creation')return 'SELECT * FROM all_classes WHERE notes_url IS NOT NULL AND classroom_url is not null and notes_type="pdf"';
-        else if($for=='final_file_creation')return 'SELECT * FROM all_classes WHERE notes_url IS NOT NULL AND classroom_url is not null and notes_type="pdf" and batch="Advanced DSA" order by day asc';
+        else if($for=='final_file_creation')return 'SELECT * FROM all_classes WHERE notes_url IS NOT NULL AND classroom_url is not null and notes_type="pdf" and batch="Intermediate DSA" order by day asc';
         else if($for=='pending_file')return 'SELECT * FROM all_classes WHERE notes_url IS NOT NULL AND classroom_url is not null and notes_type="pdf" and DAY IN (37,50,7,16)';
 
     }
@@ -160,9 +168,21 @@ class Process
     {   
         if(!file_exists($output_dir))
         {
-            $cmd='gswin64.exe -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE='.$output_dir.' -dBATCH '.$input_list.'';
-            exec($cmd);
+            if(is_array($input_list) && !empty($input_list))
+            {
+                $pdf = new PDFMerger;
+
+                foreach($input_list as $values)
+                {
+                    $pdf->addPDF($values);
+                }
+                $pdf->merge('file',$output_dir);
+            }
+
+            // $cmd='gswin64.exe -dNOPAUSE -sDEVICE=pdfwrite -sOUTPUTFILE='.$output_dir.' -dBATCH '.$input_list.'';
+            // exec($cmd);
             //echo "CMD:::".$cmd."<br>";
+            
         } 
     }
 
@@ -302,9 +322,10 @@ class Process
     {
         ini_set('max_execution_time', 3000);
         ini_set("memory_limit","-1");
-
-        $notes_pdf_dir=$this->main_dir. $this->ds .$master_folder. $this->ds;
-        $input_list=implode(" ",[$notes_pdf_dir.'first_page.pdf',$notes_pdf_dir.'index.pdf',$notes_pdf_dir.$master_folder.'_page.pdf']);
+//
+        $notes_pdf_dir=__dir__.$this->ds.$this->main_dir. $this->ds .$master_folder. $this->ds;
+        
+        $input_list=[$notes_pdf_dir.'first_page.pdf',$notes_pdf_dir.'index.pdf',$notes_pdf_dir.$master_folder.'_page.pdf'];
         $retun_file=$this->mergefiles($notes_pdf_dir.$master_folder.'_original.pdf',$input_list);
     }
 
@@ -313,5 +334,6 @@ class Process
 $data=new Process();
 //$data->All_session_list();//common function
 //$data->prepareTheIndex('Advanced DSA');//creating the index
-$data->publishPdfFile('advanced_dsa');// mege the index,first_page,final_notes_with_page
+$data->publishPdfFile('intermediate_dsa');// mege the index,first_page,final_notes_with_page
+//$data->All_session_list('delete_merge_file');//deelte merg.pdf file
 ?>
